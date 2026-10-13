@@ -69,7 +69,29 @@
         table.sd input[type=radio] {
             width: 20px;
             height: 20px;
+            margin: 0;
+            vertical-align: middle;
             cursor: pointer;
+        }
+
+        /* タッチ操作用: ボタンのまわりのマス全体を押せるようにする */
+        table.sd td.opt {
+            padding: 0;
+        }
+
+        table.sd td.opt label {
+            display: block;
+            padding: 10px 10px;
+            cursor: pointer;
+            border-radius: 6px;
+        }
+
+        table.sd td.opt label:hover {
+            background: #dde7f5;
+        }
+
+        table.sd td.opt label:has(input:checked) {
+            background: #c5d6ee;
         }
 
         .credit {
@@ -208,7 +230,7 @@
             const right = flipped[s.id] ? s.pos : s.neg;
             html += `<tr><td class="adj-l">${left}</td>`;
             for (let p = 1; p <= 7; p++) {
-                html += `<td><input type="radio" name="${s.id}" value="${p}" required></td>`;
+                html += `<td class="opt"><label><input type="radio" name="${s.id}" value="${p}" required></label></td>`;
             }
             html += `<td class="adj-r">${right}</td></tr>`;
         });
