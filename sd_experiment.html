@@ -4,14 +4,14 @@
 <head>
     <meta charset="UTF-8">
     <title>画像の印象評価実験</title>
-    <script src="https://unpkg.com/jspsych@8.2.1"></script>
-    <script src="https://unpkg.com/@jspsych/plugin-preload@2.1.0"></script>
-    <script src="https://unpkg.com/@jspsych/plugin-fullscreen@2.1.0"></script>
-    <script src="https://unpkg.com/@jspsych/plugin-survey-text@2.1.1"></script>
-    <script src="https://unpkg.com/@jspsych/plugin-html-button-response@2.1.0"></script>
-    <script src="https://unpkg.com/@jspsych/plugin-survey-html-form@2.1.0"></script>
-    <script src="https://unpkg.com/@jspsych-contrib/plugin-pipe@0.6.0"></script>
-    <link href="https://unpkg.com/jspsych@8.2.1/css/jspsych.css" rel="stylesheet" type="text/css" />
+    <script src="lib/jspsych/jspsych.js"></script>
+    <script src="lib/jspsych/plugin-preload.js"></script>
+    <script src="lib/jspsych/plugin-fullscreen.js"></script>
+    <script src="lib/jspsych/plugin-survey-text.js"></script>
+    <script src="lib/jspsych/plugin-html-button-response.js"></script>
+    <script src="lib/jspsych/plugin-survey-html-form.js"></script>
+    <script src="lib/jspsych/plugin-pipe.js"></script>
+    <link href="lib/jspsych/jspsych.css" rel="stylesheet" type="text/css" />
     <style>
         .jspsych-btn {
             padding: 12px 24px;
@@ -72,6 +72,14 @@
             cursor: pointer;
         }
 
+        .credit {
+            text-align: left;
+            max-width: 800px;
+            font-size: 13px;
+            color: #444;
+            line-height: 1.6;
+        }
+
         .inst {
             text-align: left;
             max-width: 800px;
@@ -86,46 +94,44 @@
      * 設定
      * ========================================================= */
 
-    // 因子数: 3 (評価性・活動性・力量性) または 4 (+鋭さ)
-    const N_FACTORS = 3;
-
-    // 評価対象の画像（image/ 内のファイル。追加・削除したらここを編集）
-    const IMAGES = [
-        'image/155845-1.jpg',
-        'image/173039-1.jpg',
-        'image/3626-1.jpg',
-        'image/4384-1.jpg',
-        'image/4525-1.jpg',
-        'image/4783-1.jpg',
-        'image/5143-1.jpg'
+    // 評定対象の画像と出典（image/stimuli.csv と対応。追加・削除したらここも編集）
+    // 出典表示は終了画面に出す（国立美術館所蔵作品総合目録検索システムの利用規約による）
+    const STIMULI = [
+        { file: 'image/100082-3.jpg', credit: 'セザンヌ「葉を落としたジャ・ド・ブッファンの木々」（1885-86）', url: 'https://search.artmuseums.go.jp/records.php?sakuhin=100082' },
+        { file: 'image/100094-2.jpg', credit: 'コッテ「ムーラン=ルージュの女たち」（1892年）', url: 'https://search.artmuseums.go.jp/records.php?sakuhin=100094' },
+        { file: 'image/100120-2.jpg', credit: 'クールベ「馬小屋」（1873年）', url: 'https://search.artmuseums.go.jp/records.php?sakuhin=100120' },
+        { file: 'image/100236-4.jpg', credit: 'レピーヌ「セーヌのほとり」（1880年頃）', url: 'https://search.artmuseums.go.jp/records.php?sakuhin=100236' },
+        { file: 'image/173425-3.jpg', credit: 'ベナール「スペイン舞踊」（19世紀）', url: 'https://search.artmuseums.go.jp/records.php?sakuhin=173425' },
+        { file: 'image/173437-2.jpg', credit: 'ドニ「踊り子」（19世紀）', url: 'https://search.artmuseums.go.jp/records.php?sakuhin=173437' },
+        { file: 'image/173495-2.jpg', credit: 'シニャック「グロワ」（19世紀）', url: 'https://search.artmuseums.go.jp/records.php?sakuhin=173495' },
+        { file: 'image/173515-2.jpg', credit: 'ドラクロワ「ケレスを讚えて」（19世紀）', url: 'https://search.artmuseums.go.jp/records.php?sakuhin=173515' },
+        { file: 'image/173555-2.jpg', credit: 'ドゥカン「律法学者に囲まれたキリスト」（1833年頃）', url: 'https://search.artmuseums.go.jp/records.php?sakuhin=173555' },
+        { file: 'image/183849-2.jpg', credit: 'ベルタン「ギリシアの風景」（1812年）', url: 'https://search.artmuseums.go.jp/records.php?sakuhin=183849' }
     ];
+    const IMAGES = STIMULI.map(s => s.file);
+    const CREDIT_MUSEUM = '国立西洋美術館所蔵';
+    const CREDIT_SOURCE = '国立美術館所蔵作品総合目録検索システム';
+    const CREDIT_SOURCE_URL = 'https://search.artmuseums.go.jp/';
 
-    // 形容詞対。pos を +3 側（得点が高い側）として記録する。
-    // 大山ら（1993）などの SD 法研究で用いられる3因子（＋鋭さ因子）構成を参考にした例。
+    // 形容詞対（3因子 × 3項目）。pos を +3 側（得点が高い側）として記録する。
+    // 大山ら（1993）などの SD 法研究で用いられる3因子構成を参考にした例。
     // 実際に使用する尺度は原典に当たって確認・調整すること。
     const SCALES = [
         // 評価性 (Evaluation)
         { id: 'good',      factor: 'E', pos: '良い',       neg: '悪い' },
         { id: 'like',      factor: 'E', pos: '好きな',     neg: '嫌いな' },
         { id: 'beautiful', factor: 'E', pos: '美しい',     neg: '汚い' },
-        { id: 'pleasant',  factor: 'E', pos: '快い',       neg: '不快な' },
         // 活動性 (Activity)
         { id: 'dynamic',   factor: 'A', pos: '動的な',     neg: '静的な' },
         { id: 'showy',     factor: 'A', pos: '派手な',     neg: '地味な' },
         { id: 'noisy',     factor: 'A', pos: '騒がしい',   neg: '静かな' },
-        { id: 'cheerful',  factor: 'A', pos: '陽気な',     neg: '陰気な' },
         // 力量性 (Potency)
         { id: 'strong',    factor: 'P', pos: '強い',       neg: '弱い' },
         { id: 'heavy',     factor: 'P', pos: '重い',       neg: '軽い' },
-        { id: 'hard',      factor: 'P', pos: '硬い',       neg: '柔らかい' },
-        { id: 'large',     factor: 'P', pos: '大きい',     neg: '小さい' },
-        // 鋭さ (Sharpness) — N_FACTORS = 4 のときのみ使用
-        { id: 'sharp',     factor: 'S', pos: '鋭い',       neg: '鈍い' },
-        { id: 'angular',   factor: 'S', pos: '角ばった',   neg: '丸い' },
-        { id: 'tense',     factor: 'S', pos: '緊張した',   neg: 'ゆるんだ' }
+        { id: 'hard',      factor: 'P', pos: '硬い',       neg: '柔らかい' }
     ];
 
-    const FACTOR_NAMES = { E: '評価性', A: '活動性', P: '力量性', S: '鋭さ' };
+    const FACTOR_NAMES = { E: '評価性', A: '活動性', P: '力量性' };
 
     // 7段階の目盛りラベル（左→右）
     const POINT_LABELS = ['非常に', 'かなり', 'やや', 'どちらでもない', 'やや', 'かなり', '非常に'];
@@ -151,8 +157,8 @@
 
     const participant_id = jsPsych.randomization.randomID(10);
 
-    const factors = ['E', 'A', 'P', 'S'].slice(0, N_FACTORS);
-    const scales = SCALES.filter(s => factors.includes(s.factor));
+    const factors = Object.keys(FACTOR_NAMES);
+    const scales = SCALES;
 
     // 反応バイアス対策: 参加者ごとに半数の尺度で左右（正負の極）を入れ替える
     const flipped = {};
@@ -164,7 +170,8 @@
 
     jsPsych.data.addProperties({
         participant_id: participant_id,
-        n_factors: N_FACTORS,
+        start_time: new Date().toISOString(),
+        n_factors: factors.length,
         flipped_scales: scales.filter(s => flipped[s.id]).map(s => s.id).join(';')
     });
 
@@ -294,7 +301,13 @@
 
     timeline.push({
         type: jsPsychHtmlButtonResponse,
-        stimulus: '<p>以上で実験は終了です。ご協力ありがとうございました。</p>',
+        stimulus: `<p>以上で実験は終了です。ご協力ありがとうございました。</p>
+            <div class="credit">
+            <p>使用した画像（いずれも${CREDIT_MUSEUM}）</p>
+            <ul>${STIMULI.map(s => `<li>${s.credit}　<a href="${s.url}" target="_blank" rel="noopener">${s.url}</a></li>`).join('')}</ul>
+            <p>出典：${CREDIT_SOURCE}（<a href="${CREDIT_SOURCE_URL}" target="_blank" rel="noopener">${CREDIT_SOURCE_URL}</a>）。
+            実験では画面に合わせて縮小して表示しています。</p>
+            </div>`,
         choices: ['終了']
     });
 
