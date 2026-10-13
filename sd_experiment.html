@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <title>画像の印象評価実験</title>
+    <script src="https://unpkg.com/jspsych@8.2.1"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-preload@2.1.0"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-fullscreen@2.1.0"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-survey-text@2.1.1"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-html-button-response@2.1.0"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-survey-html-form@2.1.0"></script>
+    <script src="https://unpkg.com/@jspsych-contrib/plugin-pipe@0.6.0"></script>
+    <link href="https://unpkg.com/jspsych@8.2.1/css/jspsych.css" rel="stylesheet" type="text/css" />
+    <style>
+        .jspsych-btn {
+            padding: 12px 24px;
+            font-size: 20px;
+        }
+
+        .sd-wrap {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 24px;
+            align-items: flex-start;
+            justify-content: center;
+        }
+
+        .sd-image img {
+            max-width: 45vw;
+            max-height: 80vh;
+            object-fit: contain;
+        }
+
+        table.sd {
+            border-collapse: collapse;
+            font-size: 17px;
+        }
+
+        table.sd td,
+        table.sd th {
+            padding: 4px 6px;
+            text-align: center;
+        }
+
+        table.sd th {
+            font-weight: normal;
+            font-size: 12px;
+            color: #555;
+            writing-mode: vertical-rl;
+            height: 8em;
+            white-space: nowrap;
+        }
+
+        table.sd td.adj-l {
+            text-align: right;
+            min-width: 6em;
+        }
+
+        table.sd td.adj-r {
+            text-align: left;
+            min-width: 6em;
+        }
+
+        table.sd tr:nth-child(even) {
+            background: #f2f2f2;
+        }
+
+        table.sd input[type=radio] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .inst {
+            text-align: left;
+            max-width: 800px;
+            line-height: 1.8;
+        }
+    </style>
+</head>
+
+<body></body>
+<script>
+    /* =========================================================
+     * 設定
+     * ========================================================= */
+
+    // 因子数: 3 (評価性・活動性・力量性) または 4 (+鋭さ)
+    const N_FACTORS = 3;
+
+    // 評価対象の画像（image/ 内のファイル。追加・削除したらここを編集）
+    const IMAGES = [
+        'image/155845-1.jpg',
+        'image/173039-1.jpg',
+        'image/3626-1.jpg',
+        'image/4384-1.jpg',
+        'image/4525-1.jpg',
+        'image/4783-1.jpg',
+        'image/5143-1.jpg'
+    ];
+
+    // 形容詞対。pos を +3 側（得点が高い側）として記録する。
+    // 大山ら（1993）などの SD 法研究で用いられる3因子（＋鋭さ因子）構成を参考にした例。
+    // 実際に使用する尺度は原典に当たって確認・調整すること。
+    const SCALES = [
+        // 評価性 (Evaluation)
+        { id: 'good',      factor: 'E', pos: '良い',       neg: '悪い' },
+        { id: 'like',      factor: 'E', pos: '好きな',     neg: '嫌いな' },
+        { id: 'beautiful', factor: 'E', pos: '美しい',     neg: '汚い' },
+        { id: 'pleasant',  factor: 'E', pos: '快い',       neg: '不快な' },
+        // 活動性 (Activity)
+        { id: 'dynamic',   factor: 'A', pos: '動的な',     neg: '静的な' },
+        { id: 'showy',     factor: 'A', pos: '派手な',     neg: '地味な' },
+        { id: 'noisy',     factor: 'A', pos: '騒がしい',   neg: '静かな' },
+        { id: 'cheerful',  factor: 'A', pos: '陽気な',     neg: '陰気な' },
+        // 力量性 (Potency)
+        { id: 'strong',    factor: 'P', pos: '強い',       neg: '弱い' },
+        { id: 'heavy',     factor: 'P', pos: '重い',       neg: '軽い' },
+        { id: 'hard',      factor: 'P', pos: '硬い',       neg: '柔らかい' },
+        { id: 'large',     factor: 'P', pos: '大きい',     neg: '小さい' },
+        // 鋭さ (Sharpness) — N_FACTORS = 4 のときのみ使用
+        { id: 'sharp',     factor: 'S', pos: '鋭い',       neg: '鈍い' },
+        { id: 'angular',   factor: 'S', pos: '角ばった',   neg: '丸い' },
+        { id: 'tense',     factor: 'S', pos: '緊張した',   neg: 'ゆるんだ' }
+    ];
+
+    const FACTOR_NAMES = { E: '評価性', A: '活動性', P: '力量性', S: '鋭さ' };
+
+    // 7段階の目盛りラベル（左→右）
+    const POINT_LABELS = ['非常に', 'かなり', 'やや', 'どちらでもない', 'やや', 'かなり', '非常に'];
+
+    // 尺度の提示順を画像ごとにランダム化するか（false なら参加者内で固定）
+    const RANDOMIZE_SCALE_ORDER_PER_IMAGE = false;
+
+    // データ保存: DataPipe の experiment_id を入れるとOSFへ保存、空ならCSVをダウンロード
+    const PIPE_EXPERIMENT_ID = '';
+
+    /* =========================================================
+     * 準備
+     * ========================================================= */
+
+    const jsPsych = initJsPsych({
+        on_finish: function () {
+            if (!PIPE_EXPERIMENT_ID) {
+                jsPsych.data.get().filter({ task: 'sd' })
+                    .localSave('csv', `sd_${participant_id}.csv`);
+            }
+        }
+    });
+
+    const participant_id = jsPsych.randomization.randomID(10);
+
+    const factors = ['E', 'A', 'P', 'S'].slice(0, N_FACTORS);
+    const scales = SCALES.filter(s => factors.includes(s.factor));
+
+    // 反応バイアス対策: 参加者ごとに半数の尺度で左右（正負の極）を入れ替える
+    const flipped = {};
+    jsPsych.randomization.shuffle(scales.map(s => s.id))
+        .forEach((id, i) => { flipped[id] = i < Math.floor(scales.length / 2); });
+
+    // 尺度の提示順（参加者内固定の場合に使用）
+    const fixedOrder = jsPsych.randomization.shuffle(scales);
+
+    jsPsych.data.addProperties({
+        participant_id: participant_id,
+        n_factors: N_FACTORS,
+        flipped_scales: scales.filter(s => flipped[s.id]).map(s => s.id).join(';')
+    });
+
+    function buildScaleTable(order) {
+        let html = '<table class="sd"><tr><td></td>';
+        POINT_LABELS.forEach(l => { html += `<th>${l}</th>`; });
+        html += '<td></td></tr>';
+        order.forEach(s => {
+            const left = flipped[s.id] ? s.neg : s.pos;
+            const right = flipped[s.id] ? s.pos : s.neg;
+            html += `<tr><td class="adj-l">${left}</td>`;
+            for (let p = 1; p <= 7; p++) {
+                html += `<td><input type="radio" name="${s.id}" value="${p}" required></td>`;
+            }
+            html += `<td class="adj-r">${right}</td></tr>`;
+        });
+        return html + '</table>';
+    }
+
+    // 左から 1..7 の位置を、pos 極 = +3, neg 極 = -3 の得点に変換
+    function toScore(id, position) {
+        return flipped[id] ? position - 4 : 4 - position;
+    }
+
+    /* =========================================================
+     * タイムライン
+     * ========================================================= */
+
+    const timeline = [];
+
+    timeline.push({
+        type: jsPsychPreload,
+        images: IMAGES,
+        message: '画像を読み込んでいます…'
+    });
+
+    timeline.push({
+        type: jsPsychSurveyText,
+        questions: [{ prompt: '学籍番号を入力してください', name: 'student_id', required: true }],
+        button_label: '次へ',
+        on_finish: function (data) {
+            jsPsych.data.addProperties({ student_id: data.response.student_id });
+        }
+    });
+
+    timeline.push({
+        type: jsPsychFullscreen,
+        fullscreen_mode: true,
+        message: '<p>実験は全画面で行います。下のボタンを押してください。</p>',
+        button_label: '全画面にする'
+    });
+
+    timeline.push({
+        type: jsPsychHtmlButtonResponse,
+        stimulus: `
+        <div class="inst">
+        <p>この実験では、何枚かの画像を順に見て、それぞれの画像から受ける印象を評価していただきます。</p>
+        <p>画像の横に、反対の意味をもつ形容詞の組が並んでいます。
+        画像の印象が左右どちらの言葉にどの程度近いかを考えて、7つの○のうち当てはまるものを選んでください。</p>
+        <p>たとえば「良い ― 悪い」で、とても良いと感じたら左端の「非常に」を、
+        どちらとも言えなければ中央の「どちらでもない」を選びます。</p>
+        <p>あまり深く考えず、<b>第一印象</b>で答えてください。正しい答えや間違った答えはありません。</p>
+        <p>すべての項目に答えると、次の画像に進めます。画像は全部で ${IMAGES.length} 枚です。</p>
+        </div>`,
+        choices: ['開始']
+    });
+
+    let currentOrder = fixedOrder;
+
+    const sdTrial = {
+        type: jsPsychSurveyHtmlForm,
+        preamble: () => `<p>画像 ${jsPsych.evaluateTimelineVariable('trial_no')} / ${IMAGES.length}</p>`,
+        html: '',
+        on_start: function (trial) {
+            currentOrder = RANDOMIZE_SCALE_ORDER_PER_IMAGE
+                ? jsPsych.randomization.shuffle(scales) : fixedOrder;
+            trial.html = `<div class="sd-wrap">
+                <div class="sd-image"><img src="${jsPsych.evaluateTimelineVariable('image')}"></div>
+                <div>${buildScaleTable(currentOrder)}</div>
+            </div>`;
+        },
+        button_label: '次へ',
+        post_trial_gap: 500,
+        data: {
+            task: 'sd',
+            image: jsPsych.timelineVariable('image')
+        },
+        on_finish: function (data) {
+            data.scale_order = currentOrder.map(s => s.id).join(';');
+            const sums = {};
+            factors.forEach(f => { sums[f] = []; });
+            scales.forEach(s => {
+                const position = Number(data.response[s.id]);
+                const score = toScore(s.id, position);
+                data[`pos_${s.id}`] = position;    // 画面上の位置（左=1〜右=7）
+                data[`score_${s.id}`] = score;     // pos 極 = +3 〜 neg 極 = -3
+                sums[s.factor].push(score);
+            });
+            factors.forEach(f => {
+                data[`factor_${f}`] = sums[f].reduce((a, b) => a + b, 0) / sums[f].length;
+            });
+            delete data.response;
+        }
+    };
+
+    // 画像の提示順は参加者ごとにランダム
+    timeline.push({
+        timeline: [sdTrial],
+        timeline_variables: jsPsych.randomization.shuffle(IMAGES)
+            .map((img, i) => ({ image: img, trial_no: i + 1 }))
+    });
+
+    if (PIPE_EXPERIMENT_ID) {
+        timeline.push({
+            type: jsPsychPipe,
+            action: 'save',
+            experiment_id: PIPE_EXPERIMENT_ID,
+            filename: `sd_${participant_id}.csv`,
+            data_string: () => jsPsych.data.get().filter({ task: 'sd' }).csv()
+        });
+    }
+
+    timeline.push({
+        type: jsPsychFullscreen,
+        fullscreen_mode: false
+    });
+
+    timeline.push({
+        type: jsPsychHtmlButtonResponse,
+        stimulus: '<p>以上で実験は終了です。ご協力ありがとうございました。</p>',
+        choices: ['終了']
+    });
+
+    jsPsych.run(timeline);
+</script>
+
+</html>
