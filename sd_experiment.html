@@ -10,7 +10,7 @@
     <script src="lib/jspsych/plugin-survey-text.js"></script>
     <script src="lib/jspsych/plugin-html-button-response.js"></script>
     <script src="lib/jspsych/plugin-survey-html-form.js"></script>
-    <script src="lib/jspsych/plugin-pipe.js"></script>
+    <script src="lib/jspsych/extension-pipe.js"></script>
     <link href="lib/jspsych/jspsych.css" rel="stylesheet" type="text/css" />
     <style>
         .jspsych-btn {
@@ -139,20 +139,44 @@
     // 尺度の提示順を画像ごとにランダム化するか（false なら参加者内で固定）
     const RANDOMIZE_SCALE_ORDER_PER_IMAGE = false;
 
-    // データ保存: DataPipe の experiment_id を入れるとOSFへ保存、空ならCSVをダウンロード
-    const PIPE_EXPERIMENT_ID = '';
+    // データ保存: DataPipe の experiment_id を入れると DataPipe（extension-pipe）で保存、空ならCSVをダウンロード
+    // extension-pipe は1試行ごとにもデータを送るので、途中で閉じた場合も .partial.json として残る
+    const PIPE_EXPERIMENT_ID = 'EHIz9YM2WOEP';
+    // URL に ?simulate を付けて開くと DataPipe に送らない（動作確認用。DataPipe のセッションを消費しない）
+    const SIMULATE = new URLSearchParams(location.search).has('simulate');
 
     /* =========================================================
      * 準備
      * ========================================================= */
 
+    const USE_PIPE = Boolean(PIPE_EXPERIMENT_ID) && !SIMULATE;
+
     const jsPsych = initJsPsych({
         on_finish: function () {
-            if (!PIPE_EXPERIMENT_ID) {
+            if (!USE_PIPE) {
                 jsPsych.data.get().filter({ task: 'sd' })
                     .localSave('csv', `sd_${participant_id}.csv`);
             }
-        }
+        },
+        extensions: [
+            {
+                type: jsPsychExtensionPipe,
+                params: {
+                    enabled: USE_PIPE,
+                    experiment_id: PIPE_EXPERIMENT_ID,
+                    filename: () => `sd_${participant_id}.csv`,
+                    // 分析で使う評定の試行だけを送る
+                    data_string: () => jsPsych.data.get().filter({ task: 'sd' }).csv(),
+                    wait_message: '<p>データを保存しています。このページを閉じないでください。</p>',
+                    done_message: '<p>保存が完了しました。このページを閉じてください。</p>',
+                    on_save: (result) => {
+                        if (!result.ok) {
+                            document.body.innerHTML = '<p>データを保存できませんでした。このページを閉じずに、係の人に知らせてください。</p>';
+                        }
+                    }
+                }
+            }
+        ]
     });
 
     const participant_id = jsPsych.randomization.randomID(10);
@@ -283,16 +307,6 @@
         timeline_variables: jsPsych.randomization.shuffle(IMAGES)
             .map((img, i) => ({ image: img, trial_no: i + 1 }))
     });
-
-    if (PIPE_EXPERIMENT_ID) {
-        timeline.push({
-            type: jsPsychPipe,
-            action: 'save',
-            experiment_id: PIPE_EXPERIMENT_ID,
-            filename: `sd_${participant_id}.csv`,
-            data_string: () => jsPsych.data.get().filter({ task: 'sd' }).csv()
-        });
-    }
 
     timeline.push({
         type: jsPsychFullscreen,

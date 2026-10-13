@@ -10,7 +10,6 @@
 | `plugin-survey-text.js` | @jspsych/plugin-survey-text@2.1.1 | MIT |
 | `plugin-html-button-response.js` | @jspsych/plugin-html-button-response@2.1.0 | MIT |
 | `plugin-survey-html-form.js` | @jspsych/plugin-survey-html-form@2.1.0 | MIT |
-| `plugin-pipe.js` | @jspsych-contrib/plugin-pipe@0.6.0 | MIT |
+| `extension-pipe.js` | @jspsych/extension-pipe@0.2.0 | MIT（Firebase SDK を同梱。Apache-2.0） |
 
 jsPsych: https://github.com/jspsych/jsPsych （Copyright (c) Joshua R. de Leeuw）
-jspsych-contrib: https://github.com/jspsych/jspsych-contrib
