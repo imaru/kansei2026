@@ -13,7 +13,7 @@
 | `sd_analysis.R` | 集計・可視化スクリプト（R） |
 | `data/` | 分析スクリプトが読む評定データ（CSV または Qualtrics の zip）。Qualtrics の書き出し（zip）は Git 管理外 |
 | `data_jspsych/` | jsPsych 版の動作確認用サンプルデータ 850 人分（絵画 10 枚・9 項目。学籍番号 `SAMPLE001`〜`850`。全項目に同じ位置をつけた回答 10 人、学籍番号なし 8 人、二重送信 5 件を含む） |
-| `data_qualtrics/` | Qualtrics の書き出しの保管場所（Git 管理外。動作確認用のプレビュー回答 3 件の zip だけを管理している） |
+| `data_qualtrics/` | Qualtrics の書き出しの保管場所（Git 管理外。動作確認用のプレビュー回答 3 件の zip だけを管理している）。`qualtrics/make_sample_data.py` でこの zip から Qualtrics 版のサンプルデータを作れる |
 | `output/` | 分析結果の出力先（Git 管理外） |
 
 ## 実験
@@ -114,7 +114,15 @@ install.packages(c("tidyverse", "patchwork", "ragg", "jpeg"))
 Rscript sd_analysis.R [データフォルダ] [出力フォルダ]
 ```
 
-フォルダを省略すると `data/` と `output/` を使う。jsPsych 版のサンプルデータで試すときは `Rscript sd_analysis.R data_jspsych` とする。RStudio では `kansei2026.Rproj` を開いて `sd_analysis.R` を Source する。
+フォルダを省略すると `data/` と `output/` を使う。jsPsych 版のサンプルデータで試すときは `Rscript sd_analysis.R data_jspsych` とする。
+
+Qualtrics 版のサンプルデータは、プレビュー回答の書き出しの列構成をそのまま使って作る（絵画ごとの傾向は `data_jspsych` の平均から取る。全項目に同じ位置 3%・評定時間が短すぎる 3%・途中でやめた 2%・二重送信 2% を含む）。
+
+```
+python3 qualtrics/make_sample_data.py data_qualtrics/感性2026_*.zip data_qualtrics/sample_qualtrics_850.csv [人数]
+Rscript sd_analysis.R data_qualtrics
+```
+RStudio では `kansei2026.Rproj` を開いて `sd_analysis.R` を Source する。
 
 - 因子は CSV の `factor_*` 列から自動判別する（4 因子のデータにも対応）。
 - `ResponseId` 列のあるファイルは Qualtrics の書き出しとみなし、jsPsych 版と同じ「1 行 = 評定者 × 絵画」の形に変換する。質問文に含まれる画像 URL を `loop_merge.tsv` と照合して絵画を、「左:右」の文字列を `QUALTRICS_SCALES` と照合して尺度を特定する。最後まで回答した（`Finished` が 1）回答だけを使い、評定者は学籍番号（空なら `ResponseId`）で識別する。

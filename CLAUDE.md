@@ -16,6 +16,10 @@ python3 -m http.server   # → http://localhost:8000/sd_experiment.html?simulate
 Rscript sd_analysis.R [データフォルダ] [出力フォルダ]
 Rscript sd_analysis.R data_jspsych                     # 850 人分のサンプルで動作確認（約 45 秒）
 Rscript sd_analysis.R data_jspsych <scratch の出力先>   # output/ を上書きしたくないとき
+
+# Qualtrics 版のサンプル（850 人分）を作って分析を通す（約 10 秒）
+python3 qualtrics/make_sample_data.py data_qualtrics/感性2026_*.zip data_qualtrics/sample_qualtrics_850.csv
+Rscript sd_analysis.R data_qualtrics <scratch の出力先>
 ```
 
 ビルド・lint・テストはない。変更の確認は、上記のサンプルデータで分析を通すことと、`?simulate` で実験を最後まで進めることで行う。
