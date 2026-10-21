@@ -13,7 +13,7 @@
 | `sd_analysis.R` | 集計・可視化スクリプト（R） |
 | `data/` | 分析スクリプトが読む評定データ（CSV または Qualtrics の zip）。Qualtrics の書き出し（zip）は Git 管理外 |
 | `data_jspsych/` | jsPsych 版の動作確認用サンプルデータ 850 人分（絵画 10 枚・9 項目。学籍番号 `SAMPLE001`〜`850`。全項目に同じ位置をつけた回答 10 人、学籍番号なし 8 人、二重送信 5 件を含む） |
-| `data_qualtrics/` | Qualtrics の書き出しの保管場所（Git 管理外） |
+| `data_qualtrics/` | Qualtrics の書き出しの保管場所（Git 管理外。動作確認用のプレビュー回答 3 件の zip だけを管理している） |
 | `output/` | 分析結果の出力先（Git 管理外） |
 
 ## 実験
