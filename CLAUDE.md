@@ -38,5 +38,4 @@ jsPsych は CDN を使わず `lib/jspsych/` のローカルコピーを読む（
 
 - `kansei_test.html` は初期の試作で、CDN 版 jsPsych を使う。本番の実験は `sd_experiment.html`。
 - `output/`・`data_qualtrics/`・`data/*.zip`・`.RData` などは Git 管理外。Qualtrics の書き出し（実データ）はコミットしない。
-- `QUALTRICS_EXCLUDE_PREVIEW` は動作確認のため現在 `FALSE`。本番前に `TRUE` に戻す。
 - 画像は国立美術館のパブリックドメイン画像で、出典表示が利用条件。図や終了画面の出典表示を消さない。

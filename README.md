@@ -138,7 +138,7 @@ Rscript sd_analysis.R [データフォルダ] [出力フォルダ]
 | `REQUIRE_ALL_PAINTINGS` | 全部の絵画を評定していない評定者を除外するか |
 | `QUALTRICS_LOOP_MERGE` | Loop & Merge の表のファイル（既定は `qualtrics/loop_merge.tsv`） |
 | `QUALTRICS_ID_COL` | 学籍番号を尋ねた質問の列名（既定 `Q5`） |
-| `QUALTRICS_EXCLUDE_PREVIEW` | プレビューの回答（`DistributionChannel` が `preview`）を除くか。現在は動作確認のため `FALSE`。本番では `TRUE` にする |
+| `QUALTRICS_EXCLUDE_PREVIEW` | プレビューの回答（`DistributionChannel` が `preview`）を除くか（既定 `TRUE`）。プレビューで動作確認するときは `FALSE` にする |
 | `QUALTRICS_SCALES` | Qualtrics の形容詞対と尺度 ID・因子の対応 |
 | `LIST_PLOT_MAX` | 評定者がこの人数以下のときだけ、1 人 1 行の `3b_factor_diff_raters_list.png` を出す |
 

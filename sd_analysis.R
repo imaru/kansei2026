@@ -70,8 +70,7 @@ QUALTRICS_LOOP_MERGE <- "qualtrics/loop_merge.tsv"
 #   学籍番号を尋ねた質問の列名
 QUALTRICS_ID_COL <- "Q5"
 #   プレビューの回答（DistributionChannel が preview）を除くか
-# QUALTRICS_EXCLUDE_PREVIEW <- TRUE
-QUALTRICS_EXCLUDE_PREVIEW <- FALSE
+QUALTRICS_EXCLUDE_PREVIEW <- TRUE
 #   形容詞対（sd_experiment.html の SCALES と同じ）。Statements の「左:右」の文字列と照合する
 QUALTRICS_SCALES <- tribble(
   ~id,         ~factor, ~pos,       ~neg,
