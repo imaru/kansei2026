@@ -7,10 +7,13 @@
 | パス | 内容 |
 |---|---|
 | `sd_experiment.html` | 実験プログラム（jsPsych 8） |
+| `qualtrics/` | Qualtrics で同じ実験を作るときに貼り付ける HTML と、Loop & Merge の表（`loop_merge.tsv`） |
 | `image/` | 評定対象の絵画画像と、その情報（`stimuli.csv`） |
 | `lib/jspsych/` | jsPsych 本体・プラグイン・extension-pipe（CDN を使わずに動かすためのローカル配置） |
 | `sd_analysis.R` | 集計・可視化スクリプト（R） |
-| `data/` | 評定データ（CSV）。現在は動作確認用のサンプルデータ 850 人分（絵画 10 枚・9 項目。学籍番号 `SAMPLE001`〜`850`。全項目に同じ位置をつけた回答 10 人、学籍番号なし 8 人、二重送信 5 件を含む） |
+| `data/` | 分析スクリプトが読む評定データ（CSV または Qualtrics の zip）。Qualtrics の書き出し（zip）は Git 管理外 |
+| `data_jspsych/` | jsPsych 版の動作確認用サンプルデータ 850 人分（絵画 10 枚・9 項目。学籍番号 `SAMPLE001`〜`850`。全項目に同じ位置をつけた回答 10 人、学籍番号なし 8 人、二重送信 5 件を含む） |
+| `data_qualtrics/` | Qualtrics の書き出しの保管場所（Git 管理外） |
 | `output/` | 分析結果の出力先（Git 管理外） |
 
 ## 実験
@@ -72,6 +75,25 @@ python3 -m http.server
 | `scale_order`, `flipped_scales` | 尺度の提示順、左右を入れ替えた尺度 |
 | `rt` | 1 画像の評定にかかった時間（ms） |
 
+## Qualtrics 版
+
+jsPsych の代わりに Qualtrics でも同じ評定を実施できる。`qualtrics/` のファイルを使って次のように作る。
+
+| ファイル | 貼り付け先 |
+|---|---|
+| `instructions.html` | 説明ページ（Text / Graphic 質問）。Rich Content Editor の「<>」(Source) |
+| `sd_question.html` | 評定ページ（Matrix table / Bipolar）の質問文。同上 |
+| `end_message.html` | 終了メッセージ（Survey options > End of survey > Custom message）。画像の出典を表示する |
+| `loop_merge.tsv` | 評定ページのブロックの Loop & Merge の表。Field 1 = 画像の URL（Qualtrics のライブラリにアップロードした画像）、Field 2 = 画像ファイル名 |
+
+- 学籍番号は Text entry 質問で尋ねる（分析スクリプトは列名 `Q5` を読む）。
+- 評定は Bipolar の Matrix table で、Statements に形容詞対を「左:右」（例 `良い:悪い`）で入れる。形容詞対は `sd_experiment.html` の `SCALES` と同じ。
+- Recode values で、各尺度の `pos` 側の端が +3、反対の端が −3 になるようにする。
+- jsPsych 版と違い、左右の入れ替えは参加者ごとには行わない（向きは全員共通）。画像ごとの評定時間も記録されない。
+- 画像はアップロードしやすいように、`image/` の JPEG を画質を落として再保存してある（大きさは元と同じ）。画像を差し替えたら `loop_merge.tsv` の URL も更新する。
+
+データは Data & Analysis > Export で、CSV・**Use numeric values** を選んで書き出す。ダウンロードした zip は展開せずにそのまま `data/` に置いてよい。
+
 ## 分析
 
 ### 準備
@@ -86,15 +108,16 @@ install.packages(c("tidyverse", "patchwork", "ragg", "jpeg"))
 
 ### 実行方法
 
-実験で得た CSV を `data/` に置き、リポジトリのルートで実行する。
+実験で得た CSV（jsPsych 版）または Qualtrics の書き出し（CSV か zip）を `data/` に置き、リポジトリのルートで実行する。両方を混ぜて置いてもよい。
 
 ```
 Rscript sd_analysis.R [データフォルダ] [出力フォルダ]
 ```
 
-フォルダを省略すると `data/` と `output/` を使う。RStudio では `kansei2026.Rproj` を開いて `sd_analysis.R` を Source する。
+フォルダを省略すると `data/` と `output/` を使う。jsPsych 版のサンプルデータで試すときは `Rscript sd_analysis.R data_jspsych` とする。RStudio では `kansei2026.Rproj` を開いて `sd_analysis.R` を Source する。
 
 - 因子は CSV の `factor_*` 列から自動判別する（4 因子のデータにも対応）。
+- `ResponseId` 列のあるファイルは Qualtrics の書き出しとみなし、jsPsych 版と同じ「1 行 = 評定者 × 絵画」の形に変換する。質問文に含まれる画像 URL を `loop_merge.tsv` と照合して絵画を、「左:右」の文字列を `QUALTRICS_SCALES` と照合して尺度を特定する。最後まで回答した（`Finished` が 1）回答だけを使い、評定者は学籍番号（空なら `ResponseId`）で識別する。
 - 評定者は学籍番号で識別する（空なら実験側のランダム ID）。同じ評定者の二重送信は、最初の回答（`start_time` が最も早いもの）だけを使う。
 - サムネイルは `IMAGE_DIR`（既定は `image`）から CSV の `image` 列のファイル名で探す。見つからない絵画は名前だけを表示し、警告を出す。
 - `image/stimuli.csv` があれば、図の絵画ラベルを「作家名＋作品名」にし、絵画を同ファイルの順に並べ、サムネイルを含む図に出典を注記する。
@@ -111,8 +134,12 @@ Rscript sd_analysis.R [データフォルダ] [出力フォルダ]
 | `RATER_FIGURES` | 評定者ごとの図を作る対象。`"auto"`（`RATER_FIGURES_AUTO_MAX` 人以下なら全員、多ければ作らない）、`"all"`、`"none"`、または `c("SAMPLE001", "SAMPLE002")` のような ID の指定 |
 | `N_CORES` | 評定者ごとの図を並列に作るコア数（Windows では並列化しない）。1 人あたり約 5 秒なので、850 人分は 7 コアで 10 分程度 |
 | `STRAIGHTLINE_MAX_PROP` | 全項目に同じ位置をつけた画像の割合がこの値以上の評定者を除外（既定 0.5） |
-| `MIN_MEDIAN_RT_SEC` | 1 枚あたりの評定時間の中央値がこの秒数未満の評定者を除外（既定 10 秒） |
+| `MIN_MEDIAN_RT_SEC` | 1 枚あたりの評定時間の中央値がこの秒数未満の評定者を除外（既定 10 秒）。Qualtrics のデータは回答全体の時間 ÷ 絵画の枚数で判定する |
 | `REQUIRE_ALL_PAINTINGS` | 全部の絵画を評定していない評定者を除外するか |
+| `QUALTRICS_LOOP_MERGE` | Loop & Merge の表のファイル（既定は `qualtrics/loop_merge.tsv`） |
+| `QUALTRICS_ID_COL` | 学籍番号を尋ねた質問の列名（既定 `Q5`） |
+| `QUALTRICS_EXCLUDE_PREVIEW` | プレビューの回答（`DistributionChannel` が `preview`）を除くか。現在は動作確認のため `FALSE`。本番では `TRUE` にする |
+| `QUALTRICS_SCALES` | Qualtrics の形容詞対と尺度 ID・因子の対応 |
 | `LIST_PLOT_MAX` | 評定者がこの人数以下のときだけ、1 人 1 行の `3b_factor_diff_raters_list.png` を出す |
 
 除外した評定者と理由は `0_excluded_raters.csv` に出力され、人数は実行時のメッセージにも表示される。

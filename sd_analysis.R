@@ -23,6 +23,8 @@ suppressPackageStartupMessages({
   library(jpeg)
 })
 
+rm(list=ls())
+
 args <- commandArgs(trailingOnly = TRUE)
 data_dir <- if (length(args) >= 1) args[1] else "data"
 out_dir  <- if (length(args) >= 2) args[2] else "output"
@@ -49,6 +51,7 @@ N_CORES <- max(1, parallel::detectCores() - 1)
 #   全項目に同じ位置をつけた画像の割合がこの値以上なら除外
 STRAIGHTLINE_MAX_PROP <- 0.5
 #   1枚あたりの評定時間の中央値がこの秒数未満なら除外
+#   （Qualtrics のデータは画像ごとの時間がないので、回答全体の時間 ÷ 絵画の枚数で判定する）
 MIN_MEDIAN_RT_SEC <- 10
 #   全部の絵画を評定していない評定者を除外するか
 REQUIRE_ALL_PAINTINGS <- TRUE
@@ -59,6 +62,29 @@ LIST_PLOT_MAX <- 40
 FACTOR_LABELS <- c(E = "評価性", A = "活動性", P = "力量性", S = "鋭さ")
 SCORE_MIN <- -3
 SCORE_MAX <- 3
+
+# Qualtrics の書き出し（CSV、Use numeric values。zip のままでもよい）を読むときの設定
+#   評定は Bipolar の Matrix table で、Recode values により pos 側の端を +3 にしてあるものとする
+#   Loop & Merge の表（Field 1 = 画像 URL、Field 2 = 画像ファイル名）。列の URL から絵画を特定する
+QUALTRICS_LOOP_MERGE <- "qualtrics/loop_merge.tsv"
+#   学籍番号を尋ねた質問の列名
+QUALTRICS_ID_COL <- "Q5"
+#   プレビューの回答（DistributionChannel が preview）を除くか
+# QUALTRICS_EXCLUDE_PREVIEW <- TRUE
+QUALTRICS_EXCLUDE_PREVIEW <- FALSE
+#   形容詞対（sd_experiment.html の SCALES と同じ）。Statements の「左:右」の文字列と照合する
+QUALTRICS_SCALES <- tribble(
+  ~id,         ~factor, ~pos,       ~neg,
+  "good",      "E",     "良い",     "悪い",
+  "like",      "E",     "好きな",   "嫌いな",
+  "beautiful", "E",     "美しい",   "汚い",
+  "dynamic",   "A",     "動的な",   "静的な",
+  "showy",     "A",     "派手な",   "地味な",
+  "noisy",     "A",     "騒がしい", "静かな",
+  "strong",    "P",     "強い",     "弱い",
+  "heavy",     "P",     "重い",     "軽い",
+  "hard",      "P",     "硬い",     "柔らかい"
+)
 
 dir.create(file.path(out_dir, "2_radar_raters"), recursive = TRUE, showWarnings = FALSE)
 theme_set(theme_minimal(base_family = FONT))
@@ -72,15 +98,77 @@ save_png <- function(plot, file, width, height) {
 # データ読み込み
 # ---------------------------------------------------------------
 
-files <- list.files(data_dir, pattern = "\\.csv$", full.names = TRUE)
+files <- list.files(data_dir, pattern = "\\.(csv|zip)$", full.names = TRUE)
 if (length(files) == 0) stop("CSV ファイルが見つかりません: ", data_dir)
 
+# Qualtrics の書き出し（1行 = 1回答）を、jsPsych の CSV と同じ 1行 = 評定者 × 絵画 の形にする
+from_qualtrics <- function(d) {
+  # 2行目は質問文（「質問文 - 画像URL - 左:右」）、3行目は ImportId
+  item_text <- unlist(d[1, ])
+  d <- d[-(1:2), ] |> filter(Finished == "1")
+  if (QUALTRICS_EXCLUDE_PREVIEW) d <- filter(d, DistributionChannel != "preview")
+
+  loop_merge <- read_tsv(QUALTRICS_LOOP_MERGE, col_types = "cc", show_col_types = FALSE) |>
+    set_names(c("url", "image"))
+  scale_by_pair <- bind_rows(
+    transmute(QUALTRICS_SCALES, id, factor, pair = paste0(pos, ":", neg), pos_left = TRUE),
+    transmute(QUALTRICS_SCALES, id, factor, pair = paste0(neg, ":", pos), pos_left = FALSE))
+
+  items <- tibble(col = names(item_text), text = item_text) |>
+    filter(str_detect(col, "^\\d+_Q\\d+_\\d+$")) |>
+    mutate(url = str_match(text, " - (https?://\\S+) - ")[, 2],
+           pair = str_remove(text, "^.* - ")) |>
+    left_join(loop_merge, by = "url") |>
+    left_join(scale_by_pair, by = "pair")
+  if (anyNA(items$image))
+    stop("Loop & Merge の表にない画像 URL があります（", QUALTRICS_LOOP_MERGE, "）: ",
+         paste(unique(items$url[is.na(items$image)]), collapse = ", "))
+  if (anyNA(items$id))
+    stop("QUALTRICS_SCALES にない形容詞対があります: ",
+         paste(unique(items$pair[is.na(items$id)]), collapse = ", "))
+
+  long <- d |>
+    transmute(participant_id = ResponseId,
+              student_id = .data[[QUALTRICS_ID_COL]],
+              start_time = StartDate,
+              duration_sec = as.numeric(`Duration (in seconds)`),
+              across(all_of(items$col))) |>
+    pivot_longer(all_of(items$col), names_to = "col", values_to = "score") |>
+    filter(!is.na(score), score != "") |>
+    left_join(select(items, col, image, id, factor, pos_left), by = "col") |>
+    mutate(score = as.numeric(score),
+           # 画面上の位置（左端 = 1）。左右の向きは全員共通
+           pos = if_else(pos_left, 4 - score, 4 + score))
+  if (any(abs(long$score) > 3))
+    stop("Qualtrics の評定値が -3〜+3 の範囲外です。Recode values を確認してください")
+
+  factor_means <- long |>
+    group_by(participant_id, image, factor) |>
+    summarise(value = mean(score), .groups = "drop") |>
+    pivot_wider(names_from = factor, values_from = value, names_prefix = "factor_")
+  long |>
+    select(participant_id, student_id, start_time, duration_sec, image, id, pos, score) |>
+    pivot_wider(names_from = id, values_from = c(pos, score)) |>
+    left_join(factor_means, by = c("participant_id", "image")) |>
+    # 画像ごとの時間はないので、回答全体の時間を絵画の枚数で割って rt（ミリ秒）とする
+    group_by(participant_id) |>
+    mutate(rt = duration_sec * 1000 / n(), task = "sd") |>
+    ungroup() |>
+    select(-duration_sec) |>
+    mutate(across(everything(), as.character))
+}
+
 raw <- files |>
-  map(\(f) read_csv(f, col_types = cols(.default = col_character()),
-                    show_col_types = FALSE) |>
-        mutate(source_file = basename(f))) |>
-  list_rbind() |>
-  filter(task == "sd")
+  map(\(f) {
+    d <- read_csv(f, col_types = cols(.default = col_character()), show_col_types = FALSE)
+    if ("ResponseId" %in% names(d)) d <- from_qualtrics(d)
+    mutate(d, source_file = basename(f))
+  }) |>
+  list_rbind()
+if (nrow(raw) == 0)
+  stop("評定データがありません", if (QUALTRICS_EXCLUDE_PREVIEW)
+    "（Qualtrics のプレビュー回答を使うときは QUALTRICS_EXCLUDE_PREVIEW を FALSE にする）")
+raw <- filter(raw, task == "sd")
 
 factor_cols <- intersect(paste0("factor_", names(FACTOR_LABELS)), names(raw))
 factors <- str_remove(factor_cols, "^factor_")
