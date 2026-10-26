@@ -7,7 +7,7 @@
 # 出力:
 #   1_radar_mean.png            絵画ごとの因子別得点（評定者間平均）のレーダーチャート
 #   2_radar_all_raters.png      平均に全評定者のプロフィールの分布を重ねたもの
-#   2_radar_raters/<ID>.png     平均と各評定者の比較、およびその評定者の (3b) の結果（"top" では <因子名>.png）
+#   2_radar_raters/<ID>.png     平均と各評定者の比較、およびその評定者の (3b) の結果（"top" では <因子名>.png・平均に最も近い.png）
 #                               （既定では因子ごとに寄与率が最も大きい評定者。RATER_FIGURES で指定）
 #   3a_factor_diff_mean.png     平均的に、絵画間の違いがどの因子に表れているか
 #   3b_factor_diff_raters.png   評定者が、どの因子で絵画間の違いを表現しているかの分布
@@ -38,7 +38,8 @@ IMAGE_DIR <- "image"
 STIMULI_FILE <- file.path(IMAGE_DIR, "stimuli.csv")
 
 # 評定者ごとの図（2_radar_raters/）を作る対象
-#   "top" : 因子ごとに寄与率（3b）が最も大きい評定者 1 名ずつ（3 因子なら計 3 名）。ファイル名は <因子名>.png
+#   "top" : 因子ごとに寄与率（3b）が最も大きい評定者 1 名ずつ（3 因子なら計 3 名）と、
+#           プロフィールが平均に最も近い評定者 1 名。ファイル名は <因子名>.png と 平均に最も近い.png
 #   "auto": 評定者が RATER_FIGURES_AUTO_MAX 人以下なら全員、それより多ければ作らない
 #   "all" : 全員（1人あたり数秒かかる）
 #   "none": 作らない
@@ -622,13 +623,24 @@ for (f in factor_levels) {
   top_raters <- bind_rows(top_raters, select(top, factor, rater, share))
 }
 
+# プロフィールが平均に最も近い評定者: 全絵画・全因子の得点と、評定者間平均の得点との
+# 差の二乗平均平方根（RMS）が最も小さい人
+closest_rater <- scores |>
+  left_join(select(mean_scores, painting, factor, mean = score), by = c("painting", "factor")) |>
+  group_by(rater) |>
+  summarise(rms = sqrt(mean((score - mean)^2))) |>
+  slice_min(rms, n = 1, with_ties = FALSE)
+
 figure_raters <- if (identical(RATER_FIGURES, "top")) {
   if (nrow(top_raters) > 0)
     message("因子ごとに寄与率が最も大きい評定者: ",
             paste(sprintf("%s %s（%.0f%%）", top_raters$factor, top_raters$rater,
                           top_raters$share * 100), collapse = "、"))
+  message(sprintf("プロフィールが平均に最も近い評定者: %s（RMS %.2f）",
+                  closest_rater$rater, closest_rater$rms))
   # ファイル名は因子名にする
-  setNames(top_raters$rater, top_raters$factor)
+  c(setNames(top_raters$rater, top_raters$factor),
+    setNames(closest_rater$rater, rep("平均に最も近い", nrow(closest_rater))))
 } else if (identical(RATER_FIGURES, "auto")) {
   if (length(raters) <= RATER_FIGURES_AUTO_MAX) raters else character(0)
 } else if (identical(RATER_FIGURES, "all")) {
