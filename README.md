@@ -83,6 +83,7 @@ jsPsych の代わりに Qualtrics でも同じ評定を実施できる。`qualtr
 |---|---|
 | `instructions.html` | 説明ページ（Text / Graphic 質問）。Rich Content Editor の「<>」(Source) |
 | `sd_question.html` | 評定ページ（Matrix table / Bipolar）の質問文。同上 |
+| `sd_question.js` | 評定ページの質問の JavaScript（質問のメニュー > JavaScript）。下の項目までスクロールして画像が隠れたら、縮小した画像を画面上端に固定表示する |
 | `end_message.html` | 終了メッセージ（Survey options > End of survey > Custom message）。画像の出典を表示する |
 | `loop_merge.tsv` | 評定ページのブロックの Loop & Merge の表。Field 1 = 画像の URL（Qualtrics のライブラリにアップロードした画像）、Field 2 = 画像ファイル名 |
 
