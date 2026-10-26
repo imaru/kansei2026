@@ -7,7 +7,7 @@
 # 出力:
 #   1_radar_mean.png            絵画ごとの因子別得点（評定者間平均）のレーダーチャート
 #   2_radar_all_raters.png      平均に全評定者のプロフィールの分布を重ねたもの
-#   2_radar_raters/<ID>.png     平均と各評定者の比較、およびその評定者の (3b) の結果
+#   2_radar_raters/<ID>.png     平均と各評定者の比較、およびその評定者の (3b) の結果（"top" では <因子名>.png）
 #                               （既定では因子ごとに寄与率が最も大きい評定者。RATER_FIGURES で指定）
 #   3a_factor_diff_mean.png     平均的に、絵画間の違いがどの因子に表れているか
 #   3b_factor_diff_raters.png   評定者が、どの因子で絵画間の違いを表現しているかの分布
@@ -38,7 +38,7 @@ IMAGE_DIR <- "image"
 STIMULI_FILE <- file.path(IMAGE_DIR, "stimuli.csv")
 
 # 評定者ごとの図（2_radar_raters/）を作る対象
-#   "top" : 因子ごとに寄与率（3b）が最も大きい評定者 1 名ずつ（3 因子なら計 3 名）
+#   "top" : 因子ごとに寄与率（3b）が最も大きい評定者 1 名ずつ（3 因子なら計 3 名）。ファイル名は <因子名>.png
 #   "auto": 評定者が RATER_FIGURES_AUTO_MAX 人以下なら全員、それより多ければ作らない
 #   "all" : 全員（1人あたり数秒かかる）
 #   "none": 作らない
@@ -627,7 +627,8 @@ figure_raters <- if (identical(RATER_FIGURES, "top")) {
     message("因子ごとに寄与率が最も大きい評定者: ",
             paste(sprintf("%s %s（%.0f%%）", top_raters$factor, top_raters$rater,
                           top_raters$share * 100), collapse = "、"))
-  top_raters$rater
+  # ファイル名は因子名にする
+  setNames(top_raters$rater, top_raters$factor)
 } else if (identical(RATER_FIGURES, "auto")) {
   if (length(raters) <= RATER_FIGURES_AUTO_MAX) raters else character(0)
 } else if (identical(RATER_FIGURES, "all")) {
@@ -641,7 +642,8 @@ figure_raters <- if (identical(RATER_FIGURES, "top")) {
   intersect(RATER_FIGURES, raters)
 }
 
-rater_figure <- function(rt) {
+# file: 出力するファイル名（拡張子なし）
+rater_figure <- function(rt, file = rt) {
   this <- filter(rater_xy, rater == rt)
   radar <- radar_figure(\(pt) list(
     geom_polygon(data = filter(mean_xy, painting == pt), aes(fill = "平均", colour = "平均"),
@@ -686,9 +688,12 @@ rater_figure <- function(rt) {
       caption = credit_text,
       subtitle = "上: 絵画ごとの因子得点　下: 絵画間の違いをどの因子で表現しているか（全体平均との比較）",
       theme = title_theme)
-  save_png(p2, file.path("2_radar_raters", paste0(rt, ".png")), max(radar_w, 12), radar_h + 4)
+  save_png(p2, file.path("2_radar_raters", paste0(file, ".png")), max(radar_w, 12), radar_h + 4)
   invisible(NULL)
 }
+
+# 名前があれば（"top"）それをファイル名に、なければ評定者IDをファイル名にする
+figure_files <- if (is.null(names(figure_raters))) figure_raters else names(figure_raters)
 
 if (length(figure_raters) > 0) {
   message(sprintf("評定者ごとの図を %d 名分作成します（%d コア）", length(figure_raters), N_CORES))
@@ -697,9 +702,10 @@ if (length(figure_raters) > 0) {
                         filter(scores, rater %in% no_diff$rater) |>
                           group_by(rater) |> group_modify(\(d, k) between_painting(d)) |> ungroup())
   if (.Platform$OS.type == "windows" || N_CORES <= 1) {
-    walk(figure_raters, rater_figure)
+    walk2(figure_raters, figure_files, rater_figure)
   } else {
-    res <- parallel::mclapply(figure_raters, \(rt) tryCatch(rater_figure(rt), error = \(e) conditionMessage(e)),
+    res <- parallel::mclapply(seq_along(figure_raters),
+                              \(i) tryCatch(rater_figure(figure_raters[[i]], figure_files[[i]]), error = \(e) conditionMessage(e)),
                               mc.cores = N_CORES)
     errs <- keep(res, is.character)
     if (length(errs) > 0) warning("評定者ごとの図でエラー: ", errs[[1]])
