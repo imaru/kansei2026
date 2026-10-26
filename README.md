@@ -139,7 +139,7 @@ RStudio では `kansei2026.Rproj` を開いて `sd_analysis.R` を Source する
 | `FONT` | 図の日本語フォント |
 | `IMAGE_DIR` | サムネイルに使う画像のフォルダ |
 | `STIMULI_FILE` | 絵画の情報のファイル（既定は `image/stimuli.csv`） |
-| `RATER_FIGURES` | 評定者ごとの図を作る対象。`"auto"`（`RATER_FIGURES_AUTO_MAX` 人以下なら全員、多ければ作らない）、`"all"`、`"none"`、または `c("SAMPLE001", "SAMPLE002")` のような ID の指定 |
+| `RATER_FIGURES` | 評定者ごとの図を作る対象。`"top"`（既定。因子ごとに寄与率（3b）が最も大きい評定者 1 名ずつ、3 因子なら計 3 名）、`"auto"`（`RATER_FIGURES_AUTO_MAX` 人以下なら全員、多ければ作らない）、`"all"`、`"none"`、または `c("SAMPLE001", "SAMPLE002")` のような ID の指定 |
 | `N_CORES` | 評定者ごとの図を並列に作るコア数（Windows では並列化しない）。1 人あたり約 5 秒なので、850 人分は 7 コアで 10 分程度 |
 | `STRAIGHTLINE_MAX_PROP` | 全項目に同じ位置をつけた画像の割合がこの値以上の評定者を除外（既定 0.5） |
 | `MIN_MEDIAN_RT_SEC` | 1 枚あたりの評定時間の中央値がこの秒数未満の評定者を除外（既定 10 秒）。Qualtrics のデータは回答全体の時間 ÷ 絵画の枚数で判定する |

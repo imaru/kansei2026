@@ -8,7 +8,7 @@
 #   1_radar_mean.png            絵画ごとの因子別得点（評定者間平均）のレーダーチャート
 #   2_radar_all_raters.png      平均に全評定者のプロフィールの分布を重ねたもの
 #   2_radar_raters/<ID>.png     平均と各評定者の比較、およびその評定者の (3b) の結果
-#                               （作るかどうかは RATER_FIGURES で指定）
+#                               （既定では因子ごとに寄与率が最も大きい評定者。RATER_FIGURES で指定）
 #   3a_factor_diff_mean.png     平均的に、絵画間の違いがどの因子に表れているか
 #   3b_factor_diff_raters.png   評定者が、どの因子で絵画間の違いを表現しているかの分布
 #   3b_factor_diff_raters_list.png  同じ内容を1人1行で示したもの（評定者が少ないときのみ）
@@ -38,11 +38,12 @@ IMAGE_DIR <- "image"
 STIMULI_FILE <- file.path(IMAGE_DIR, "stimuli.csv")
 
 # 評定者ごとの図（2_radar_raters/）を作る対象
+#   "top" : 因子ごとに寄与率（3b）が最も大きい評定者 1 名ずつ（3 因子なら計 3 名）
 #   "auto": 評定者が RATER_FIGURES_AUTO_MAX 人以下なら全員、それより多ければ作らない
 #   "all" : 全員（1人あたり数秒かかる）
 #   "none": 作らない
 #   c("SAMPLE001", "SAMPLE002"): 指定した評定者だけ
-RATER_FIGURES <- "auto"
+RATER_FIGURES <- "top"
 RATER_FIGURES_AUTO_MAX <- 50
 # 評定者ごとの図を並列に作るコア数（Windows では 1 になる）
 N_CORES <- max(1, parallel::detectCores() - 1)
@@ -607,7 +608,27 @@ if (length(rater_order) <= LIST_PLOT_MAX) {
 # (2) 評定者ごとのファイル: 平均との比較レーダー＋その評定者の (3b)
 # ---------------------------------------------------------------
 
-figure_raters <- if (identical(RATER_FIGURES, "auto")) {
+# 因子ごとに寄与率が最も大きい評定者。同じ評定者が複数の因子で最大になったときは、
+# 後の因子では次点の評定者を選び、全部で因子の数だけの人数にする
+top_raters <- tibble(factor = factor(character(0), levels = factor_levels),
+                     rater = character(0), share = numeric(0))
+for (f in factor_levels) {
+  top <- diff_rater |>
+    filter(factor == f, !rater %in% top_raters$rater, !is.na(share)) |>
+    left_join(select(rater_summary, rater, total_sd), by = "rater") |>
+    # 寄与率が同じなら、絵画間の違いを大きくつけている評定者を優先する
+    arrange(desc(share), desc(total_sd)) |>
+    slice_head(n = 1)
+  top_raters <- bind_rows(top_raters, select(top, factor, rater, share))
+}
+
+figure_raters <- if (identical(RATER_FIGURES, "top")) {
+  if (nrow(top_raters) > 0)
+    message("因子ごとに寄与率が最も大きい評定者: ",
+            paste(sprintf("%s %s（%.0f%%）", top_raters$factor, top_raters$rater,
+                          top_raters$share * 100), collapse = "、"))
+  top_raters$rater
+} else if (identical(RATER_FIGURES, "auto")) {
   if (length(raters) <= RATER_FIGURES_AUTO_MAX) raters else character(0)
 } else if (identical(RATER_FIGURES, "all")) {
   raters
